@@ -9,6 +9,7 @@ struct SidebarView: View {
             ForEach(workspace.tree) { FileRow(node: $0, expanded: $workspace.expanded) }
         }
         .listStyle(.sidebar)
+        .contentMargins(.top, 0, for: .scrollContent)
         .onAppear { selection = workspace.current }
         .onChange(of: workspace.current) { _, url in selection = url }
         .onChange(of: selection) { _, url in

@@ -12,7 +12,9 @@ final class SplitController: NSSplitViewController {
         super.viewDidAppear()
         guard !positioned else { return }
         positioned = true
-        splitView.setPosition(fittedWidth(), ofDividerAt: 0)
+        // A saved divider position wins; fit to content only on the first launch.
+        let saved = splitView.autosaveName.map { UserDefaults.standard.object(forKey: "NSSplitView Subview Frames \($0)") != nil } ?? false
+        if !saved { splitView.setPosition(fittedWidth(), ofDividerAt: 0) }
     }
 
     override func splitView(_ splitView: NSSplitView, shouldCollapseSubview subview: NSView, forDoubleClickOnDividerAt dividerIndex: Int) -> Bool {
@@ -48,16 +50,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, 
         panel.isReleasedWhenClosed = false
         panel.hidesOnDeactivate = false
         panel.titlebarAppearsTransparent = false
-        panel.setFrameAutosaveName("main")
         let split = SplitController()
         split.fittedWidth = { [unowned self] in workspace.fittedSidebarWidth }
-        let sidebarItem = NSSplitViewItem(sidebarWithViewController: NSHostingController(rootView: SidebarView().environmentObject(workspace)))
+        let sidebar = NSHostingController(rootView: SidebarView().environmentObject(workspace))
+        let detail = NSHostingController(rootView: DetailView().environmentObject(workspace).environmentObject(prefs))
+        // SwiftUI must not resize the window to its fitting size; the saved frame rules.
+        sidebar.sizingOptions = []
+        detail.sizingOptions = []
+        let sidebarItem = NSSplitViewItem(sidebarWithViewController: sidebar)
         sidebarItem.minimumThickness = 160
         sidebarItem.maximumThickness = 600
         split.addSplitViewItem(sidebarItem)
-        split.addSplitViewItem(NSSplitViewItem(viewController: NSHostingController(rootView: DetailView().environmentObject(workspace).environmentObject(prefs))))
+        split.addSplitViewItem(NSSplitViewItem(viewController: detail))
         panel.contentViewController = split
-        panel.setContentSize(NSSize(width: 1100, height: 760))
+        split.splitView.autosaveName = "split"
+        // Restore the last frame; the default size and centering are for the first launch only.
+        if !panel.setFrameUsingName("main") {
+            panel.setContentSize(NSSize(width: 1100, height: 760))
+            panel.center()
+        }
+        panel.setFrameAutosaveName("main")
         // Only takes effect once the item is installed in a live split view.
         sidebarItem.isCollapsed = prefs.teleprompter
         let toolbar = NSToolbar(identifier: "main")
@@ -71,7 +83,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, 
         prefs.$themeName.sink { [unowned self] name in
             panel.appearance = Theme.all.first { $0.name == name }?.nsAppearance
         }.store(in: &bag)
-        panel.center()
         panel.makeKeyAndOrderFront(nil)
 
         NSApp.mainMenu = buildMenu()

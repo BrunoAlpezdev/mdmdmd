@@ -4,6 +4,7 @@ import SwiftUI
 /// Plain-text NSTextView whose storage gets Markdown styling laid over it.
 final class MarkdownTextView: NSTextView, NSTextStorageDelegate {
     var baseSize: CGFloat = 16 { didSet { restyle() } }
+    var topMargin: CGFloat = 32 { didSet { textContainerInset = NSSize(width: textContainerInset.width, height: topMargin) } }
     var theme: Theme = .system {
         didSet {
             backgroundColor = theme.backgroundColor
@@ -46,7 +47,7 @@ final class MarkdownTextView: NSTextView, NSTextStorageDelegate {
     override func setFrameSize(_ newSize: NSSize) {
         super.setFrameSize(newSize)
         let side = max(24, (newSize.width - Self.maxContentWidth) / 2)
-        if textContainerInset.width != side { textContainerInset = NSSize(width: side, height: 32) }
+        if textContainerInset.width != side { textContainerInset = NSSize(width: side, height: topMargin) }
     }
 
     func textStorage(_ textStorage: NSTextStorage, didProcessEditing editedMask: NSTextStorageEditActions, range editedRange: NSRange, changeInLength delta: Int) {
@@ -154,6 +155,7 @@ struct EditorView: NSViewRepresentable {
         if textView.baseSize != size { textView.baseSize = size }
         let theme = prefs.theme
         if textView.theme != theme { textView.theme = theme }
+        if textView.topMargin != prefs.topMargin { textView.topMargin = prefs.topMargin }
         if textView.string != workspace.text {
             textView.string = workspace.text
             textView.undoManager?.removeAllActions()

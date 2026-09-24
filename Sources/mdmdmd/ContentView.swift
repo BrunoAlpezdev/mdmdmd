@@ -41,6 +41,13 @@ struct DetailView: View {
                 Text(current.lastPathComponent + (workspace.dirty ? " •" : ""))
             }
             Spacer()
+            HStack(spacing: 6) {
+                Image(systemName: "arrow.up.and.down.text.horizontal")
+                Slider(value: $prefs.topMargin, in: 0...200).frame(width: 110)
+                Text("\(Int(prefs.topMargin))").monospacedDigit().frame(width: 26, alignment: .trailing)
+            }
+            .controlSize(.mini)
+            .help("Top margin")
             Text("\(words) spoken words · \(seconds / 60):\(String(format: "%02d", seconds % 60)) at 150 wpm")
             if prefs.hiddenFromCapture {
                 Label("Hidden from capture", systemImage: "eye.slash").labelStyle(.titleAndIcon)

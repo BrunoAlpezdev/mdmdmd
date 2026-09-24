@@ -161,6 +161,10 @@ final class Prefs: ObservableObject {
         didSet { UserDefaults.standard.set(hiddenFromCapture, forKey: "hiddenFromCapture") }
     }
     @Published var opacity: CGFloat = 1
+    /// Space above the first line, in points. Reading from a distance wants more of it.
+    @Published var topMargin: Double = UserDefaults.standard.object(forKey: "topMargin") as? Double ?? 32 {
+        didSet { UserDefaults.standard.set(topMargin, forKey: "topMargin") }
+    }
     @Published var themeName: String = UserDefaults.standard.string(forKey: "theme") ?? Theme.system.name {
         didSet { UserDefaults.standard.set(themeName, forKey: "theme") }
     }

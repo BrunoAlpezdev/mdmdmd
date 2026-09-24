@@ -44,7 +44,7 @@ struct ContentView: View {
         func widest(_ nodes: [FileNode], depth: CGFloat) -> CGFloat {
             nodes.reduce(0) { best, node in
                 let label = (node.name as NSString).size(withAttributes: [.font: font]).width
-                var width = 56 + depth * 18 + label
+                var width = 80 + depth * 18 + label
                 if node.isDirectory, workspace.expanded.contains(node.url) {
                     width = max(width, widest(node.children ?? [], depth: depth + 1))
                 }

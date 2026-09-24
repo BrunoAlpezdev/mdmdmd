@@ -4,6 +4,13 @@ import SwiftUI
 /// Plain-text NSTextView whose storage gets Markdown styling laid over it.
 final class MarkdownTextView: NSTextView, NSTextStorageDelegate {
     var baseSize: CGFloat = 16 { didSet { restyle() } }
+    var theme: Theme = .system {
+        didSet {
+            backgroundColor = theme.backgroundColor
+            insertionPointColor = theme.textColor
+            restyle()
+        }
+    }
     var onChange: ((String) -> Void)?
     private var lastActiveParagraph = NSRange(location: NSNotFound, length: 0)
     private var isRestyling = false
@@ -53,7 +60,7 @@ final class MarkdownTextView: NSTextView, NSTextStorageDelegate {
 
     override func didChangeText() {
         super.didChangeText()
-        typingAttributes = Styler.baseAttributes(size: baseSize)
+        typingAttributes = Styler.baseAttributes(size: baseSize, theme: theme)
     }
 
     func selectionChanged() {
@@ -68,8 +75,8 @@ final class MarkdownTextView: NSTextView, NSTextStorageDelegate {
         isRestyling = true
         let active = (string as NSString).paragraphRange(for: selectedRange())
         lastActiveParagraph = active
-        Styler.apply(to: storage, baseSize: baseSize, activeRange: active)
-        typingAttributes = Styler.baseAttributes(size: baseSize)
+        Styler.apply(to: storage, baseSize: baseSize, activeRange: active, theme: theme)
+        typingAttributes = Styler.baseAttributes(size: baseSize, theme: theme)
         isRestyling = false
     }
 
@@ -145,6 +152,8 @@ struct EditorView: NSViewRepresentable {
         guard let textView = scroll.documentView as? MarkdownTextView else { return }
         let size = prefs.editorSize
         if textView.baseSize != size { textView.baseSize = size }
+        let theme = prefs.theme
+        if textView.theme != theme { textView.theme = theme }
         if textView.string != workspace.text {
             textView.string = workspace.text
             textView.undoManager?.removeAllActions()

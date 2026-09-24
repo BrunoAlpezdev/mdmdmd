@@ -161,6 +161,11 @@ final class Prefs: ObservableObject {
         didSet { UserDefaults.standard.set(hiddenFromCapture, forKey: "hiddenFromCapture") }
     }
     @Published var opacity: CGFloat = 1
+    @Published var themeName: String = UserDefaults.standard.string(forKey: "theme") ?? Theme.system.name {
+        didSet { UserDefaults.standard.set(themeName, forKey: "theme") }
+    }
+
+    var theme: Theme { Theme.all.first { $0.name == themeName } ?? .system }
 
     /// Teleprompter reads from across the desk; bump the type.
     var editorSize: CGFloat { teleprompter ? baseSize * 1.4 : baseSize }

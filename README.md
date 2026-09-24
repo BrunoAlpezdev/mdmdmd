@@ -33,6 +33,34 @@ Both work for a personal machine.
   View > Visible in Screen Capture turns it off.
 - Teleprompter mode (⇧⌘T): floats above everything including full-screen apps, never steals focus from the app being recorded, hides the sidebar, bumps the type 40% and drops opacity to 90%.
 - Lists continue on Enter; an empty item ends the list.
+- Themes, under View > Theme.
+  Five ship with the app: System, Paper, Night, Graphite and Prompter.
+
+## Themes
+
+A theme is a JSON file in `~/Library/Application Support/mdmdmd/Themes/`.
+View > Theme > Open Themes Folder creates the folder with an example to copy from.
+Every field is optional; whatever is missing falls back to the system look.
+
+```json
+{
+  "name": "Paper",
+  "appearance": "light",
+  "background": "#F6F1E7",
+  "text": "#2A2622",
+  "secondary": "#9A9082",
+  "accent": "#B5562D",
+  "codeBackground": "#EDE5D5",
+  "font": "serif",
+  "monoFont": "JetBrains Mono",
+  "lineHeight": 1.45
+}
+```
+
+`appearance` is `light` or `dark` and drives the window chrome.
+`secondary` colors syntax markers, list bullets and blockquotes; `accent` colors links.
+`font` is `system`, `serif` (New York), `rounded` (SF Rounded) or any installed family name.
+`lineHeight` is a multiple of the font's natural line height.
 
 ## Development
 

@@ -27,21 +27,21 @@ enum Styler {
 
     /// Restyles `storage` in place. `activeRange` is the paragraph range holding
     /// the selection; nil means "editing nowhere", so every marker collapses.
-    static func apply(to storage: NSMutableAttributedString, baseSize: CGFloat, activeRange: NSRange?) {
+    static func apply(to storage: NSMutableAttributedString, baseSize: CGFloat, activeRange: NSRange?, theme: Theme = .system) {
         let text = storage.string
         let full = NSRange(location: 0, length: storage.length)
-        let result = analyze(text, baseSize: baseSize)
+        let result = analyze(text, baseSize: baseSize, theme: theme)
 
         storage.beginEditing()
-        storage.setAttributes(baseAttributes(size: baseSize), range: full)
+        storage.setAttributes(baseAttributes(size: baseSize, theme: theme), range: full)
         for span in result.spans { span.apply(storage, span.range) }
         for range in result.listMarkers {
-            storage.addAttribute(.foregroundColor, value: NSColor.secondaryLabelColor, range: range)
+            storage.addAttribute(.foregroundColor, value: theme.secondaryColor, range: range)
         }
         for marker in result.markers {
             let revealed = activeRange.map { NSIntersectionRange($0, marker.owner).length > 0 || NSLocationInRange($0.location, marker.owner) } ?? false
             if revealed {
-                storage.addAttribute(.foregroundColor, value: NSColor.tertiaryLabelColor, range: marker.range)
+                storage.addAttribute(.foregroundColor, value: theme.tertiaryColor, range: marker.range)
             } else {
                 storage.addAttributes([.font: collapsedFont, .foregroundColor: NSColor.clear], range: marker.range)
             }
@@ -50,10 +50,10 @@ enum Styler {
     }
 
     /// The document as a reader sees it: styled, with every syntax marker removed.
-    static func rendered(_ text: String, baseSize: CGFloat) -> NSAttributedString {
+    static func rendered(_ text: String, baseSize: CGFloat, theme: Theme = .system) -> NSAttributedString {
         let storage = NSMutableAttributedString(string: text)
-        apply(to: storage, baseSize: baseSize, activeRange: nil)
-        let markers = analyze(text, baseSize: baseSize).markers.map(\.range).sorted { $0.location > $1.location }
+        apply(to: storage, baseSize: baseSize, activeRange: nil, theme: theme)
+        let markers = analyze(text, baseSize: baseSize, theme: theme).markers.map(\.range).sorted { $0.location > $1.location }
         for range in markers { storage.deleteCharacters(in: range) }
         return storage
     }
@@ -66,15 +66,15 @@ enum Styler {
         return counter.count
     }
 
-    static func baseAttributes(size: CGFloat) -> [NSAttributedString.Key: Any] {
-        [.font: NSFont.systemFont(ofSize: size),
-         .foregroundColor: NSColor.textColor,
-         .paragraphStyle: paragraphStyle(size: size)]
+    static func baseAttributes(size: CGFloat, theme: Theme = .system) -> [NSAttributedString.Key: Any] {
+        [.font: theme.bodyFont(size: size),
+         .foregroundColor: theme.textColor,
+         .paragraphStyle: paragraphStyle(size: size, theme: theme)]
     }
 
-    static func paragraphStyle(size: CGFloat, headIndent: CGFloat = 0, firstLineIndent: CGFloat = 0, spacingBefore: CGFloat = 0) -> NSParagraphStyle {
+    static func paragraphStyle(size: CGFloat, theme: Theme, headIndent: CGFloat = 0, firstLineIndent: CGFloat = 0, spacingBefore: CGFloat = 0) -> NSParagraphStyle {
         let style = NSMutableParagraphStyle()
-        style.lineHeightMultiple = 1.3
+        style.lineHeightMultiple = theme.lineHeightMultiple
         style.paragraphSpacing = size * 0.5
         style.paragraphSpacingBefore = spacingBefore
         style.headIndent = headIndent
@@ -82,8 +82,8 @@ enum Styler {
         return style
     }
 
-    static func analyze(_ text: String, baseSize: CGFloat) -> Result {
-        var walker = StyleWalker(text: text, baseSize: baseSize)
+    static func analyze(_ text: String, baseSize: CGFloat, theme: Theme) -> Result {
+        var walker = StyleWalker(text: text, baseSize: baseSize, theme: theme)
         walker.visit(Document(parsing: text))
         return walker.result
     }
@@ -118,14 +118,16 @@ private struct StyleWalker: MarkupWalker {
     let text: String
     let ns: NSString
     let baseSize: CGFloat
+    let theme: Theme
     let map: LineMap
     var result = Styler.Result()
     var listDepth = 0
 
-    init(text: String, baseSize: CGFloat) {
+    init(text: String, baseSize: CGFloat, theme: Theme) {
         self.text = text
         self.ns = text as NSString
         self.baseSize = baseSize
+        self.theme = theme
         self.map = LineMap(text)
     }
 
@@ -161,9 +163,10 @@ private struct StyleWalker: MarkupWalker {
         return NSFont(descriptor: descriptor, size: font.pointSize) ?? font
     }
 
-    static func mono(_ font: NSFont) -> NSFont {
-        let bold = font.fontDescriptor.symbolicTraits.contains(.bold)
-        return NSFont.monospacedSystemFont(ofSize: font.pointSize * 0.92, weight: bold ? .semibold : .regular)
+    /// Monospace at the same size, keeping bold. Closures cannot capture the
+    /// mutating walker, so callers pass `theme` in.
+    static func mono(_ font: NSFont, theme: Theme) -> NSFont {
+        theme.monoFont(size: font.pointSize * 0.92, bold: font.fontDescriptor.symbolicTraits.contains(.bold))
     }
 
     // MARK: blocks
@@ -172,9 +175,10 @@ private struct StyleWalker: MarkupWalker {
         if let r = range(heading) {
             let scale: CGFloat = [2.0, 1.55, 1.3, 1.15, 1.05, 1.0][min(heading.level, 6) - 1]
             let size = baseSize * scale
+            let theme = self.theme
             span(r) { s, r in
                 Self.modifyFont(s, r) { Self.withTrait(NSFont(descriptor: $0.fontDescriptor, size: size) ?? $0, .bold) }
-                s.addAttribute(.paragraphStyle, value: Styler.paragraphStyle(size: size, spacingBefore: size * 0.6), range: r)
+                s.addAttribute(.paragraphStyle, value: Styler.paragraphStyle(size: size, theme: theme, spacingBefore: size * 0.6), range: r)
             }
             // ATX heading: "## " at the start. Setext headings have no leading marker.
             let prefix = heading.level + 1
@@ -187,8 +191,9 @@ private struct StyleWalker: MarkupWalker {
 
     mutating func visitBlockQuote(_ quote: BlockQuote) {
         if let r = range(quote) {
+            let theme = self.theme
             span(r) { s, r in
-                s.addAttribute(.foregroundColor, value: NSColor.secondaryLabelColor, range: r)
+                s.addAttribute(.foregroundColor, value: theme.secondaryColor, range: r)
                 Self.modifyFont(s, r) { Self.withTrait($0, .italic) }
                 s.enumerateAttribute(.paragraphStyle, in: r) { value, sub, _ in
                     let style = ((value as? NSParagraphStyle) ?? NSParagraphStyle.default).mutableCopy() as! NSMutableParagraphStyle
@@ -207,10 +212,11 @@ private struct StyleWalker: MarkupWalker {
     mutating func visitCodeBlock(_ block: CodeBlock) {
         guard let r = range(block) else { return }
         let size = baseSize
+        let theme = self.theme
         span(r) { s, r in
-            Self.modifyFont(s, r, Self.mono)
-            s.addAttribute(.backgroundColor, value: NSColor.quaternarySystemFill, range: r)
-            s.addAttribute(.paragraphStyle, value: Styler.paragraphStyle(size: size, headIndent: 12, firstLineIndent: 12), range: r)
+            Self.modifyFont(s, r) { Self.mono($0, theme: theme) }
+            s.addAttribute(.backgroundColor, value: theme.codeBackgroundColor, range: r)
+            s.addAttribute(.paragraphStyle, value: Styler.paragraphStyle(size: size, theme: theme, headIndent: 12, firstLineIndent: 12), range: r)
         }
         // Fenced blocks: the opening and closing fence lines collapse.
         let firstLine = ns.lineRange(for: NSRange(location: r.location, length: 0))
@@ -229,8 +235,9 @@ private struct StyleWalker: MarkupWalker {
         if let r = range(item) {
             let depth = CGFloat(listDepth)
             let size = baseSize
+            let theme = self.theme
             span(r) { s, r in
-                s.addAttribute(.paragraphStyle, value: Styler.paragraphStyle(size: size, headIndent: 22 * depth, firstLineIndent: 22 * (depth - 1)), range: r)
+                s.addAttribute(.paragraphStyle, value: Styler.paragraphStyle(size: size, theme: theme, headIndent: 22 * depth, firstLineIndent: 22 * (depth - 1)), range: r)
             }
             if let first = item.children.first(where: { $0.range != nil }), let fr = range(first), fr.location > r.location {
                 result.listMarkers.append(NSRange(location: r.location, length: fr.location - r.location))
@@ -242,7 +249,8 @@ private struct StyleWalker: MarkupWalker {
 
     mutating func visitTable(_ table: Table) {
         if let r = range(table) {
-            span(r) { s, r in Self.modifyFont(s, r, Self.mono) }
+            let theme = self.theme
+            span(r) { s, r in Self.modifyFont(s, r) { Self.mono($0, theme: theme) } }
         }
         descendInto(table)
     }
@@ -256,16 +264,21 @@ private struct StyleWalker: MarkupWalker {
 
     mutating func visitThematicBreak(_ rule: ThematicBreak) {
         if let r = range(rule) {
-            span(r) { s, r in s.addAttribute(.foregroundColor, value: NSColor.tertiaryLabelColor, range: r) }
+            let theme = self.theme
+            span(r) { s, r in s.addAttribute(.foregroundColor, value: theme.tertiaryColor, range: r) }
         }
     }
 
     mutating func visitHTMLBlock(_ html: HTMLBlock) {
-        if let r = range(html) {
-            span(r) { s, r in
-                Self.modifyFont(s, r, Self.mono)
-                s.addAttribute(.foregroundColor, value: NSColor.secondaryLabelColor, range: r)
-            }
+        if let r = range(html) { dimMono(r) }
+    }
+
+    /// Raw HTML: monospace and pushed back, it is not content.
+    mutating func dimMono(_ r: NSRange) {
+        let theme = self.theme
+        span(r) { s, r in
+            Self.modifyFont(s, r) { Self.mono($0, theme: theme) }
+            s.addAttribute(.foregroundColor, value: theme.secondaryColor, range: r)
         }
     }
 
@@ -293,9 +306,10 @@ private struct StyleWalker: MarkupWalker {
 
     mutating func visitInlineCode(_ code: InlineCode) {
         guard let r = range(code) else { return }
+        let theme = self.theme
         span(r) { s, r in
-            Self.modifyFont(s, r, Self.mono)
-            s.addAttribute(.backgroundColor, value: NSColor.quaternarySystemFill, range: r)
+            Self.modifyFont(s, r) { Self.mono($0, theme: theme) }
+            s.addAttribute(.backgroundColor, value: theme.codeBackgroundColor, range: r)
         }
         var ticks = 0
         while ticks < r.length, ns.character(at: r.location + ticks) == UInt16(UInt8(ascii: "`")) { ticks += 1 }
@@ -310,8 +324,9 @@ private struct StyleWalker: MarkupWalker {
                 marker(NSRange(location: NSMaxRange(last), length: NSMaxRange(r) - NSMaxRange(last)), owner: r)
                 let textRange = NSRange(location: first.location, length: NSMaxRange(last) - first.location)
                 let destination = link.destination.flatMap(URL.init(string:))
+                let theme = self.theme
                 span(textRange) { s, r in
-                    s.addAttribute(.foregroundColor, value: NSColor.linkColor, range: r)
+                    s.addAttribute(.foregroundColor, value: theme.accentColor, range: r)
                     s.addAttribute(.underlineStyle, value: NSUnderlineStyle.single.rawValue, range: r)
                     if let destination { s.addAttribute(.link, value: destination, range: r) }
                 }
@@ -322,17 +337,13 @@ private struct StyleWalker: MarkupWalker {
 
     mutating func visitImage(_ image: Image) {
         if let r = range(image) {
-            span(r) { s, r in s.addAttribute(.foregroundColor, value: NSColor.secondaryLabelColor, range: r) }
+            let theme = self.theme
+            span(r) { s, r in s.addAttribute(.foregroundColor, value: theme.secondaryColor, range: r) }
         }
     }
 
     mutating func visitInlineHTML(_ html: InlineHTML) {
-        if let r = range(html) {
-            span(r) { s, r in
-                Self.modifyFont(s, r, Self.mono)
-                s.addAttribute(.foregroundColor, value: NSColor.secondaryLabelColor, range: r)
-            }
-        }
+        if let r = range(html) { dimMono(r) }
     }
 }
 

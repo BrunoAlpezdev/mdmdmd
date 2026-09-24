@@ -65,6 +65,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, 
         panel.toolbar = toolbar
         panel.toolbarStyle = .unified
         prefs.$teleprompter.dropFirst().sink { sidebarItem.animator().isCollapsed = $0 }.store(in: &bag)
+        prefs.$themeName.sink { [unowned self] _ in panel.appearance = prefs.theme.nsAppearance }.store(in: &bag)
         panel.center()
         panel.makeKeyAndOrderFront(nil)
 
@@ -159,6 +160,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, 
     }
 
     @objc func toggleTeleprompter(_ sender: Any?) { prefs.teleprompter.toggle() }
+    @objc func setTheme(_ sender: NSMenuItem) { prefs.themeName = sender.representedObject as! String }
+    @objc func openThemesFolder(_ sender: Any?) { Theme.revealFolder() }
+    @objc func reloadThemes(_ sender: Any?) { rebuildThemeMenu(); prefs.themeName = prefs.themeName }
     @objc func toggleCapture(_ sender: Any?) { prefs.hiddenFromCapture.toggle() }
     @objc func zoomIn(_ sender: Any?) { prefs.baseSize = min(prefs.baseSize + 2, 48) }
     @objc func zoomOut(_ sender: Any?) { prefs.baseSize = max(prefs.baseSize - 2, 10) }
@@ -169,6 +173,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, 
         switch item.action {
         case #selector(toggleTeleprompter): item.state = prefs.teleprompter ? .on : .off
         case #selector(toggleCapture): item.state = prefs.hiddenFromCapture ? .off : .on
+        case #selector(setTheme): item.state = (item.representedObject as? String) == prefs.themeName ? .on : .off
         case #selector(setOpacity): item.state = Int(prefs.opacity * 100) == item.tag ? .on : .off
         case #selector(save): return workspace.dirty
         case #selector(exportHTML), #selector(exportPDF): return workspace.current != nil
@@ -220,6 +225,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, 
         view.addItem(withTitle: "Visible in Screen Capture", action: #selector(toggleCapture), keyEquivalent: "")
         view.addItem(item("Toggle Sidebar", #selector(NSSplitViewController.toggleSidebar(_:)), "s", [.command, .control]))
         view.addItem(.separator())
+        view.addItem(submenu(themeMenu, title: "Theme"))
+        rebuildThemeMenu()
+        view.addItem(.separator())
         view.addItem(withTitle: "Zoom In", action: #selector(zoomIn), keyEquivalent: "+")
         view.addItem(withTitle: "Zoom Out", action: #selector(zoomOut), keyEquivalent: "-")
         view.addItem(withTitle: "Actual Size", action: #selector(zoomReset), keyEquivalent: "0")
@@ -239,6 +247,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, 
         main.addItem(submenu(window, title: "Window"))
         NSApp.windowsMenu = window
         return main
+    }
+
+    private let themeMenu = NSMenu(title: "Theme")
+
+    /// Built-in themes, then the JSON files in the themes folder.
+    private func rebuildThemeMenu() {
+        themeMenu.removeAllItems()
+        for (index, theme) in Theme.all.enumerated() {
+            if index == Theme.builtIn.count { themeMenu.addItem(.separator()) }
+            let entry = NSMenuItem(title: theme.name, action: #selector(setTheme), keyEquivalent: "")
+            entry.representedObject = theme.name
+            themeMenu.addItem(entry)
+        }
+        themeMenu.addItem(.separator())
+        themeMenu.addItem(withTitle: "Open Themes Folder…", action: #selector(openThemesFolder), keyEquivalent: "")
+        themeMenu.addItem(withTitle: "Reload Themes", action: #selector(reloadThemes), keyEquivalent: "")
     }
 
     private func item(_ title: String, _ action: Selector, _ key: String, _ mods: NSEvent.ModifierFlags) -> NSMenuItem {

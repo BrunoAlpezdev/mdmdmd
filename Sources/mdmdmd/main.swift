@@ -54,11 +54,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, 
         let sidebarItem = NSSplitViewItem(sidebarWithViewController: NSHostingController(rootView: SidebarView().environmentObject(workspace)))
         sidebarItem.minimumThickness = 160
         sidebarItem.maximumThickness = 600
-        sidebarItem.isCollapsed = prefs.teleprompter
         split.addSplitViewItem(sidebarItem)
         split.addSplitViewItem(NSSplitViewItem(viewController: NSHostingController(rootView: DetailView().environmentObject(workspace).environmentObject(prefs))))
         panel.contentViewController = split
         panel.setContentSize(NSSize(width: 1100, height: 760))
+        // Only takes effect once the item is installed in a live split view.
+        sidebarItem.isCollapsed = prefs.teleprompter
         let toolbar = NSToolbar(identifier: "main")
         toolbar.delegate = self
         toolbar.displayMode = .iconOnly

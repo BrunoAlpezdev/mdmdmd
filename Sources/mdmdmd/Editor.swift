@@ -4,7 +4,8 @@ import SwiftUI
 /// Plain-text NSTextView whose storage gets Markdown styling laid over it.
 final class MarkdownTextView: NSTextView, NSTextStorageDelegate {
     var baseSize: CGFloat = 16 { didSet { restyle() } }
-    var topMargin: CGFloat = 32 { didSet { textContainerInset = NSSize(width: textContainerInset.width, height: topMargin) } }
+    var topMargin: CGFloat = 32 { didSet { updateInsets() } }
+    var columnWidth: CGFloat = 760 { didSet { updateInsets() } }
     var theme: Theme = .system {
         didSet {
             backgroundColor = theme.backgroundColor
@@ -15,8 +16,6 @@ final class MarkdownTextView: NSTextView, NSTextStorageDelegate {
     var onChange: ((String) -> Void)?
     private var lastActiveParagraph = NSRange(location: NSNotFound, length: 0)
     private var isRestyling = false
-
-    static let maxContentWidth: CGFloat = 760
 
     override init(frame frameRect: NSRect, textContainer container: NSTextContainer?) {
         super.init(frame: frameRect, textContainer: container)
@@ -46,8 +45,13 @@ final class MarkdownTextView: NSTextView, NSTextStorageDelegate {
     // Center the column, Typora style.
     override func setFrameSize(_ newSize: NSSize) {
         super.setFrameSize(newSize)
-        let side = max(24, (newSize.width - Self.maxContentWidth) / 2)
-        if textContainerInset.width != side { textContainerInset = NSSize(width: side, height: topMargin) }
+        updateInsets()
+    }
+
+    private func updateInsets() {
+        let side = max(24, (frame.width - columnWidth) / 2)
+        let inset = NSSize(width: side, height: topMargin)
+        if textContainerInset != inset { textContainerInset = inset }
     }
 
     func textStorage(_ textStorage: NSTextStorage, didProcessEditing editedMask: NSTextStorageEditActions, range editedRange: NSRange, changeInLength delta: Int) {
@@ -156,6 +160,7 @@ struct EditorView: NSViewRepresentable {
         let theme = prefs.theme
         if textView.theme != theme { textView.theme = theme }
         if textView.topMargin != prefs.topMargin { textView.topMargin = prefs.topMargin }
+        if textView.columnWidth != prefs.columnWidth { textView.columnWidth = prefs.columnWidth }
         if textView.string != workspace.text {
             textView.string = workspace.text
             textView.undoManager?.removeAllActions()

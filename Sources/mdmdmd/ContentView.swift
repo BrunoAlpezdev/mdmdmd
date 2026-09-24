@@ -41,13 +41,8 @@ struct DetailView: View {
                 Text(current.lastPathComponent + (workspace.dirty ? " •" : ""))
             }
             Spacer()
-            HStack(spacing: 6) {
-                Image(systemName: "arrow.up.and.down.text.horizontal")
-                Slider(value: $prefs.topMargin, in: 0...200).frame(width: 110)
-                Text("\(Int(prefs.topMargin))").monospacedDigit().frame(width: 26, alignment: .trailing)
-            }
-            .controlSize(.mini)
-            .help("Top margin")
+            knob("arrow.up.and.down.text.horizontal", $prefs.topMargin, 0...200, "Top margin")
+            knob("arrow.left.and.right.text.vertical", $prefs.columnWidth, 480...2400, "Column width")
             Text("\(words) spoken words · \(seconds / 60):\(String(format: "%02d", seconds % 60)) at 150 wpm")
             if prefs.hiddenFromCapture {
                 Label("Hidden from capture", systemImage: "eye.slash").labelStyle(.titleAndIcon)
@@ -61,6 +56,16 @@ struct DetailView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 5)
         .background(.bar)
+    }
+
+    private func knob(_ icon: String, _ value: Binding<Double>, _ range: ClosedRange<Double>, _ help: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+            Slider(value: value, in: range).frame(width: 100)
+            Text("\(Int(value.wrappedValue))").monospacedDigit().frame(width: 32, alignment: .trailing)
+        }
+        .controlSize(.mini)
+        .help(help)
     }
 }
 

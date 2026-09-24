@@ -165,6 +165,10 @@ final class Prefs: ObservableObject {
     @Published var topMargin: Double = UserDefaults.standard.object(forKey: "topMargin") as? Double ?? 32 {
         didSet { UserDefaults.standard.set(topMargin, forKey: "topMargin") }
     }
+    /// Widest the text column gets, in points; the rest is side margin.
+    @Published var columnWidth: Double = UserDefaults.standard.object(forKey: "columnWidth") as? Double ?? 760 {
+        didSet { UserDefaults.standard.set(columnWidth, forKey: "columnWidth") }
+    }
     @Published var themeName: String = UserDefaults.standard.string(forKey: "theme") ?? Theme.system.name {
         didSet { UserDefaults.standard.set(themeName, forKey: "theme") }
     }

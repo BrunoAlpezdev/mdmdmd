@@ -33,6 +33,10 @@ Both work for a personal machine.
   View > Visible in Screen Capture turns it off.
 - Teleprompter mode (⇧⌘T): floats above everything including full-screen apps, never steals focus from the app being recorded, hides the sidebar, bumps the type 40% and drops opacity to 90%.
 - Lists continue on Enter; an empty item ends the list.
+- Top margin and column width sliders in the status bar, both persisted.
+- File > Pin as Default Folder keeps the sidebar on one folder.
+  A file opened from anywhere else (Finder, `open`, the Open dialog) is moved into it first, with a numeric suffix on a name clash.
+  Session restore and sidebar clicks never move anything.
 - Themes, under View > Theme.
   Five ship with the app: System, Paper, Night, Graphite and Prompter.
 

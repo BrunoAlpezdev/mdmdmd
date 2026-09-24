@@ -65,8 +65,12 @@ final class Workspace: ObservableObject {
         return min(600, max(180, ceil(widest(tree, depth: 0))))
     }
 
-    func openFile(_ url: URL) {
+    /// `relocate` is true only for files the user explicitly opened from
+    /// outside (Finder, `open`, the Open dialog). Session restore and sidebar
+    /// clicks never move anything.
+    func openFile(_ url: URL, relocate: Bool = false) {
         guard FileManager.default.fileExists(atPath: url.path) else { return }
+        let url = relocate ? (defaultRoot.map { moveIntoDefaultFolder(url, root: $0) } ?? url) : url
         if defaultRoot == nil, root == nil || !url.path.hasPrefix(root!.path) { openFolder(url.deletingLastPathComponent()) }
         autosave?.cancel()
         current = url
@@ -82,11 +86,32 @@ final class Workspace: ObservableObject {
         watch(url)
     }
 
+    /// A file opened from outside the pinned folder moves into it, so every
+    /// script ends up in one place. A name clash gets a numeric suffix.
+    private func moveIntoDefaultFolder(_ url: URL, root: URL) -> URL {
+        guard !url.path.hasPrefix(root.path + "/") else { return url }
+        let fm = FileManager.default
+        var target = root.appendingPathComponent(url.lastPathComponent)
+        var n = 2
+        while fm.fileExists(atPath: target.path) {
+            target = root.appendingPathComponent("\(url.deletingPathExtension().lastPathComponent) \(n).\(url.pathExtension)")
+            n += 1
+        }
+        do {
+            try fm.moveItem(at: url, to: target)
+            reloadTree()
+            return target
+        } catch {
+            NSAlert(error: error).runModal()
+            return url
+        }
+    }
+
     /// Opens whatever Finder or `open` handed us: a folder or a file.
     func open(_ url: URL) {
         var isDir: ObjCBool = false
         FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir)
-        isDir.boolValue ? openFolder(url) : openFile(url)
+        isDir.boolValue ? openFolder(url) : openFile(url, relocate: true)
     }
 
     func editorChanged(_ newText: String) {

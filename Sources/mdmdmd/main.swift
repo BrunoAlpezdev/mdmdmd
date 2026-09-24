@@ -121,7 +121,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, 
     @objc func openFile(_ sender: Any?) {
         let dialog = NSOpenPanel()
         dialog.allowedContentTypes = [.plainText, .init(filenameExtension: "md")!].compactMap { $0 }
-        if dialog.runModal() == .OK, let url = dialog.url { workspace.openFile(url) }
+        if dialog.runModal() == .OK, let url = dialog.url { workspace.openFile(url, relocate: true) }
     }
 
     @objc func save(_ sender: Any?) { workspace.save() }

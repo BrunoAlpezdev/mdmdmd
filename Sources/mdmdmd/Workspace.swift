@@ -1,0 +1,142 @@
+import AppKit
+import Combine
+
+struct FileNode: Identifiable, Hashable {
+    let url: URL
+    var children: [FileNode]?
+    var id: URL { url }
+    var name: String { url.lastPathComponent }
+    var isDirectory: Bool { children != nil }
+}
+
+/// The opened folder, the current file, and the text being edited.
+@MainActor
+final class Workspace: ObservableObject {
+    @Published private(set) var root: URL?
+    @Published private(set) var tree: [FileNode] = []
+    @Published var current: URL?
+    @Published private(set) var text = ""
+    @Published private(set) var dirty = false
+
+    private var watcher: DispatchSourceFileSystemObject?
+    private var autosave: Task<Void, Never>?
+    private let defaults = UserDefaults.standard
+
+    init() {
+        if let path = defaults.string(forKey: "root") { openFolder(URL(fileURLWithPath: path)) }
+        if let path = defaults.string(forKey: "current") { openFile(URL(fileURLWithPath: path)) }
+    }
+
+    func openFolder(_ url: URL) {
+        root = url
+        defaults.set(url.path, forKey: "root")
+        reloadTree()
+    }
+
+    func reloadTree() {
+        tree = root.map(Self.scan) ?? []
+    }
+
+    func openFile(_ url: URL) {
+        guard FileManager.default.fileExists(atPath: url.path) else { return }
+        if root == nil || !url.path.hasPrefix(root!.path) { openFolder(url.deletingLastPathComponent()) }
+        autosave?.cancel()
+        current = url
+        defaults.set(url.path, forKey: "current")
+        text = (try? String(contentsOf: url, encoding: .utf8)) ?? ""
+        dirty = false
+        watch(url)
+    }
+
+    /// Opens whatever Finder or `open` handed us: a folder or a file.
+    func open(_ url: URL) {
+        var isDir: ObjCBool = false
+        FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir)
+        isDir.boolValue ? openFolder(url) : openFile(url)
+    }
+
+    func editorChanged(_ newText: String) {
+        guard newText != text else { return }
+        text = newText
+        guard current != nil else { return }
+        dirty = true
+        autosave?.cancel()
+        autosave = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(1))
+            guard !Task.isCancelled else { return }
+            self?.save()
+        }
+    }
+
+    func save() {
+        guard let current, dirty else { return }
+        do {
+            try text.write(to: current, atomically: true, encoding: .utf8)
+            dirty = false
+            watch(current)  // atomic write replaced the inode
+        } catch {
+            NSAlert(error: error).runModal()
+        }
+    }
+
+    /// Reloads when the file changes underneath us (Claude rewrites scripts in place).
+    private func watch(_ url: URL) {
+        watcher?.cancel()
+        let fd = Darwin.open(url.path, O_EVTONLY)
+        guard fd >= 0 else { return }
+        let source = DispatchSource.makeFileSystemObjectSource(fileDescriptor: fd, eventMask: [.write, .rename, .delete], queue: .main)
+        source.setEventHandler { [weak self] in
+            guard let self, !self.dirty, self.current == url else { return }
+            // Writers truncate then write; give them a moment.
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(150))
+                guard !self.dirty, self.current == url,
+                      let fresh = try? String(contentsOf: url, encoding: .utf8), fresh != self.text else { return }
+                self.text = fresh
+            }
+            if source.data.contains(.rename) || source.data.contains(.delete) { self.watch(url) }
+        }
+        source.setCancelHandler { close(fd) }
+        source.resume()
+        watcher = source
+    }
+
+    private static func scan(_ dir: URL) -> [FileNode] {
+        let keys: [URLResourceKey] = [.isDirectoryKey, .nameKey]
+        guard let items = try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: keys, options: [.skipsHiddenFiles]) else { return [] }
+        let skipped: Set<String> = ["node_modules", ".build", "build", "dist", "DerivedData", "Pods", "target"]
+        var nodes: [FileNode] = []
+        for url in items {
+            let isDir = (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
+            if isDir {
+                if skipped.contains(url.lastPathComponent) { continue }
+                let children = scan(url)
+                if !children.isEmpty { nodes.append(FileNode(url: url, children: children)) }
+            } else if ["md", "markdown", "txt"].contains(url.pathExtension.lowercased()) {
+                nodes.append(FileNode(url: url, children: nil))
+            }
+        }
+        return nodes.sorted { a, b in
+            if a.isDirectory != b.isDirectory { return a.isDirectory }
+            return a.name.localizedStandardCompare(b.name) == .orderedAscending
+        }
+    }
+}
+
+/// View preferences, persisted in UserDefaults.
+@MainActor
+final class Prefs: ObservableObject {
+    @Published var baseSize: CGFloat = UserDefaults.standard.object(forKey: "baseSize") as? CGFloat ?? 16 {
+        didSet { UserDefaults.standard.set(baseSize, forKey: "baseSize") }
+    }
+    @Published var teleprompter = UserDefaults.standard.bool(forKey: "teleprompter") {
+        didSet { UserDefaults.standard.set(teleprompter, forKey: "teleprompter") }
+    }
+    @Published var hiddenFromCapture = UserDefaults.standard.object(forKey: "hiddenFromCapture") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(hiddenFromCapture, forKey: "hiddenFromCapture") }
+    }
+    @Published var opacity: CGFloat = 1
+
+    /// Teleprompter reads from across the desk; bump the type.
+    var editorSize: CGFloat { teleprompter ? baseSize * 1.4 : baseSize }
+}

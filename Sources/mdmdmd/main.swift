@@ -2,8 +2,40 @@ import AppKit
 import Combine
 import SwiftUI
 
+/// AppKit owns the split so a divider double-click fits the sidebar to its
+/// content. SwiftUI's NavigationSplitView expands it to the maximum instead.
+final class SplitController: NSSplitViewController {
+    var fittedWidth: () -> CGFloat = { 260 }
+    private var positioned = false
+
+    override func viewDidAppear() {
+        super.viewDidAppear()
+        guard !positioned else { return }
+        positioned = true
+        splitView.setPosition(fittedWidth(), ofDividerAt: 0)
+    }
+
+    override func splitView(_ splitView: NSSplitView, shouldCollapseSubview subview: NSView, forDoubleClickOnDividerAt dividerIndex: Int) -> Bool {
+        splitView.setPosition(fittedWidth(), ofDividerAt: dividerIndex)
+        return false
+    }
+}
+
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, NSToolbarDelegate {
+    func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
+        [.toggleSidebar, .sidebarTrackingSeparator, .flexibleSpace]
+    }
+
+    func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
+        toolbarDefaultItemIdentifiers(toolbar)
+    }
+
+    // All items are system-provided; AppKit builds them when this returns nil.
+    func toolbar(_ toolbar: NSToolbar, itemForItemIdentifier itemIdentifier: NSToolbarItem.Identifier, willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? {
+        nil
+    }
+
     let workspace = Workspace()
     let prefs = Prefs()
     var panel: NSPanel!
@@ -17,8 +49,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         panel.hidesOnDeactivate = false
         panel.titlebarAppearsTransparent = false
         panel.setFrameAutosaveName("main")
-        panel.contentViewController = NSHostingController(rootView: ContentView().environmentObject(workspace).environmentObject(prefs))
+        let split = SplitController()
+        split.fittedWidth = { [unowned self] in workspace.fittedSidebarWidth }
+        let sidebarItem = NSSplitViewItem(sidebarWithViewController: NSHostingController(rootView: SidebarView().environmentObject(workspace)))
+        sidebarItem.minimumThickness = 160
+        sidebarItem.maximumThickness = 600
+        sidebarItem.isCollapsed = prefs.teleprompter
+        split.addSplitViewItem(sidebarItem)
+        split.addSplitViewItem(NSSplitViewItem(viewController: NSHostingController(rootView: DetailView().environmentObject(workspace).environmentObject(prefs))))
+        panel.contentViewController = split
         panel.setContentSize(NSSize(width: 1100, height: 760))
+        let toolbar = NSToolbar(identifier: "main")
+        toolbar.delegate = self
+        toolbar.displayMode = .iconOnly
+        panel.toolbar = toolbar
+        panel.toolbarStyle = .unified
+        prefs.$teleprompter.dropFirst().sink { sidebarItem.animator().isCollapsed = $0 }.store(in: &bag)
         panel.center()
         panel.makeKeyAndOrderFront(nil)
 

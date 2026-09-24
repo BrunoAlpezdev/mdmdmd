@@ -1,35 +1,14 @@
 import SwiftUI
 
-struct ContentView: View {
+struct SidebarView: View {
     @EnvironmentObject var workspace: Workspace
-    @EnvironmentObject var prefs: Prefs
-    @State private var columns: NavigationSplitViewVisibility = UserDefaults.standard.bool(forKey: "teleprompter") ? .detailOnly : .all
     @State private var selection: URL?
 
     var body: some View {
-        NavigationSplitView(columnVisibility: $columns) {
-            sidebar
-        } detail: {
-            VStack(spacing: 0) {
-                if workspace.current == nil {
-                    ContentUnavailableView("No file open", systemImage: "doc.text", description: Text("Open a folder (⇧⌘O) or a file (⌘O)."))
-                } else {
-                    EditorView()
-                }
-                statusBar
-            }
-        }
-        .onChange(of: prefs.teleprompter) { _, on in columns = on ? .detailOnly : .all }
-    }
-
-    private var sidebar: some View {
         List(selection: $selection) {
             ForEach(workspace.tree) { FileRow(node: $0, expanded: $workspace.expanded) }
         }
-        .navigationTitle(workspace.root?.lastPathComponent ?? "mdmdmd")
-        // Double-clicking the divider snaps back to the ideal width, so the
-        // ideal tracks the widest visible row and the sidebar fits its content.
-        .navigationSplitViewColumnWidth(min: 160, ideal: fittedWidth, max: 600)
+        .listStyle(.sidebar)
         .onAppear { selection = workspace.current }
         .onChange(of: workspace.current) { _, url in selection = url }
         .onChange(of: selection) { _, url in
@@ -37,21 +16,21 @@ struct ContentView: View {
         }
         .contextMenu { Button("Reload") { workspace.reloadTree() } }
     }
+}
 
-    /// Width of the widest visible row: indentation, disclosure chevron, icon, label, padding.
-    private var fittedWidth: CGFloat {
-        let font = NSFont.systemFont(ofSize: NSFont.systemFontSize)
-        func widest(_ nodes: [FileNode], depth: CGFloat) -> CGFloat {
-            nodes.reduce(0) { best, node in
-                let label = (node.name as NSString).size(withAttributes: [.font: font]).width
-                var width = 80 + depth * 18 + label
-                if node.isDirectory, workspace.expanded.contains(node.url) {
-                    width = max(width, widest(node.children ?? [], depth: depth + 1))
-                }
-                return max(best, width)
+struct DetailView: View {
+    @EnvironmentObject var workspace: Workspace
+    @EnvironmentObject var prefs: Prefs
+
+    var body: some View {
+        VStack(spacing: 0) {
+            if workspace.current == nil {
+                ContentUnavailableView("No file open", systemImage: "doc.text", description: Text("Open a folder (⇧⌘O) or a file (⌘O)."))
+            } else {
+                EditorView()
             }
+            statusBar
         }
-        return min(600, max(180, ceil(widest(workspace.tree, depth: 0))))
     }
 
     private var statusBar: some View {

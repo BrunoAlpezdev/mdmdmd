@@ -40,6 +40,22 @@ final class Workspace: ObservableObject {
         tree = root.map(Self.scan) ?? []
     }
 
+    /// Width of the widest visible sidebar row: indentation, chevron, icon, label, padding.
+    var fittedSidebarWidth: CGFloat {
+        let font = NSFont.systemFont(ofSize: NSFont.systemFontSize)
+        func widest(_ nodes: [FileNode], depth: CGFloat) -> CGFloat {
+            nodes.reduce(0) { best, node in
+                let label = (node.name as NSString).size(withAttributes: [.font: font]).width
+                var width = 80 + depth * 18 + label
+                if node.isDirectory, expanded.contains(node.url) {
+                    width = max(width, widest(node.children ?? [], depth: depth + 1))
+                }
+                return max(best, width)
+            }
+        }
+        return min(600, max(180, ceil(widest(tree, depth: 0))))
+    }
+
     func openFile(_ url: URL) {
         guard FileManager.default.fileExists(atPath: url.path) else { return }
         if root == nil || !url.path.hasPrefix(root!.path) { openFolder(url.deletingLastPathComponent()) }

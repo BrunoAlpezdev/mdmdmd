@@ -33,29 +33,48 @@ struct DetailView: View {
         }
     }
 
+    /// Never wraps: as the window narrows the sliders go first, then the file
+    /// name, and the reading time stays.
     private var statusBar: some View {
-        let words = Styler.spokenWords(workspace.text)
-        let seconds = Int(Double(words) / 150 * 60)
-        return HStack(spacing: 12) {
-            if let current = workspace.current {
-                Text(current.lastPathComponent + (workspace.dirty ? " •" : ""))
-            }
-            Spacer()
-            knob("arrow.up.and.down.text.horizontal", $prefs.topMargin, 0...200, "Top margin")
-            knob("arrow.left.and.right.text.vertical", $prefs.columnWidth, 480...2400, "Column width")
-            Text("\(words) spoken words · \(seconds / 60):\(String(format: "%02d", seconds % 60)) at 150 wpm")
-            if prefs.hiddenFromCapture {
-                Label("Hidden from capture", systemImage: "eye.slash").labelStyle(.titleAndIcon)
-            }
-            if prefs.teleprompter {
-                Label("Teleprompter", systemImage: "pin.fill")
-            }
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 12) { fileName; Spacer(); knobs; stats }
+            HStack(spacing: 12) { fileName; Spacer(); stats }
+            HStack(spacing: 12) { Spacer(); stats }
         }
+        .lineLimit(1)
         .font(.caption)
         .foregroundStyle(.secondary)
         .padding(.horizontal, 12)
         .padding(.vertical, 5)
         .background(.bar)
+    }
+
+    private var fileName: some View {
+        Text((workspace.current?.lastPathComponent ?? "") + (workspace.dirty ? " •" : ""))
+            .truncationMode(.middle)
+    }
+
+    private var knobs: some View {
+        HStack(spacing: 12) {
+            knob("arrow.up.and.down.text.horizontal", $prefs.topMargin, 0...200, "Top margin")
+            knob("arrow.left.and.right.text.vertical", $prefs.columnWidth, 480...2400, "Column width")
+        }
+        .fixedSize()
+    }
+
+    private var stats: some View {
+        let words = Styler.spokenWords(workspace.text)
+        let seconds = Int(Double(words) / 150 * 60)
+        return HStack(spacing: 12) {
+            Text("\(words) spoken words · \(seconds / 60):\(String(format: "%02d", seconds % 60)) at 150 wpm")
+            if prefs.hiddenFromCapture {
+                Image(systemName: "eye.slash").help("Hidden from screen capture")
+            }
+            if prefs.teleprompter {
+                Image(systemName: "pin.fill").help("Teleprompter mode")
+            }
+        }
+        .fixedSize()
     }
 
     private func knob(_ icon: String, _ value: Binding<Double>, _ range: ClosedRange<Double>, _ help: String) -> some View {

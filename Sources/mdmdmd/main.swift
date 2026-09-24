@@ -64,7 +64,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, 
         toolbar.delegate = self
         toolbar.displayMode = .iconOnly
         panel.toolbar = toolbar
-        panel.toolbarStyle = .unified
+        panel.toolbarStyle = .unifiedCompact
+        panel.titleVisibility = .hidden  // the status bar already names the file
         prefs.$teleprompter.dropFirst().sink { sidebarItem.animator().isCollapsed = $0 }.store(in: &bag)
         // @Published emits before the property is set, so read the new name from the emission.
         prefs.$themeName.sink { [unowned self] name in

@@ -98,6 +98,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, 
 
     func application(_ application: NSApplication, open urls: [URL]) {
         urls.forEach(workspace.open)
+        // Opening a file is an explicit ask for this window, even when the app
+        // was already running behind something else.
+        panel.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {

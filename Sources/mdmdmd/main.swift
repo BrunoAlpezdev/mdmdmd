@@ -66,7 +66,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, 
         panel.toolbar = toolbar
         panel.toolbarStyle = .unified
         prefs.$teleprompter.dropFirst().sink { sidebarItem.animator().isCollapsed = $0 }.store(in: &bag)
-        prefs.$themeName.sink { [unowned self] _ in panel.appearance = prefs.theme.nsAppearance }.store(in: &bag)
+        // @Published emits before the property is set, so read the new name from the emission.
+        prefs.$themeName.sink { [unowned self] name in
+            panel.appearance = Theme.all.first { $0.name == name }?.nsAppearance
+        }.store(in: &bag)
         panel.center()
         panel.makeKeyAndOrderFront(nil)
 

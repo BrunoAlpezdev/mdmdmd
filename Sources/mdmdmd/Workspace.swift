@@ -24,8 +24,17 @@ final class Workspace: ObservableObject {
     private var autosave: Task<Void, Never>?
     private let defaults = UserDefaults.standard
 
+    /// A folder the sidebar always shows, whatever file gets opened. Nil means
+    /// the sidebar follows the opened file's folder.
+    @Published var defaultRoot: URL? = UserDefaults.standard.string(forKey: "defaultRoot").map { URL(fileURLWithPath: $0) } {
+        didSet {
+            defaults.set(defaultRoot?.path, forKey: "defaultRoot")
+            if let defaultRoot { openFolder(defaultRoot) }
+        }
+    }
+
     init() {
-        if let path = defaults.string(forKey: "root") { openFolder(URL(fileURLWithPath: path)) }
+        if let path = (defaults.string(forKey: "defaultRoot") ?? defaults.string(forKey: "root")) { openFolder(URL(fileURLWithPath: path)) }
         if let path = defaults.string(forKey: "current") { openFile(URL(fileURLWithPath: path)) }
     }
 
@@ -58,7 +67,7 @@ final class Workspace: ObservableObject {
 
     func openFile(_ url: URL) {
         guard FileManager.default.fileExists(atPath: url.path) else { return }
-        if root == nil || !url.path.hasPrefix(root!.path) { openFolder(url.deletingLastPathComponent()) }
+        if defaultRoot == nil, root == nil || !url.path.hasPrefix(root!.path) { openFolder(url.deletingLastPathComponent()) }
         autosave?.cancel()
         current = url
         // Reveal the file: expand every folder between the root and it.

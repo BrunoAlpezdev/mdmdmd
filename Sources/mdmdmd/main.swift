@@ -126,6 +126,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, 
 
     @objc func save(_ sender: Any?) { workspace.save() }
 
+    /// Pins the open folder as the sidebar's home, or unpins it.
+    @objc func toggleDefaultFolder(_ sender: Any?) {
+        workspace.defaultRoot = workspace.defaultRoot == nil ? workspace.root : nil
+    }
+
     @objc func exportHTML(_ sender: Any?) {
         guard let url = savePanel(extension: "html") else { return }
         let rendered = Styler.rendered(workspace.text, baseSize: 16)
@@ -181,6 +186,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, 
         case #selector(setTheme): item.state = (item.representedObject as? String) == prefs.themeName ? .on : .off
         case #selector(setOpacity): item.state = Int(prefs.opacity * 100) == item.tag ? .on : .off
         case #selector(save): return workspace.dirty
+        case #selector(toggleDefaultFolder):
+            if let pinned = workspace.defaultRoot {
+                item.title = "Unpin \(pinned.lastPathComponent) as Default Folder"
+                item.state = .on
+            } else {
+                item.title = "Pin \(workspace.root?.lastPathComponent ?? "Folder") as Default Folder"
+                item.state = .off
+                return workspace.root != nil
+            }
         case #selector(exportHTML), #selector(exportPDF): return workspace.current != nil
         default: break
         }
@@ -202,6 +216,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, 
         let file = NSMenu(title: "File")
         file.addItem(withTitle: "Open…", action: #selector(openFile), keyEquivalent: "o")
         file.addItem(item("Open Folder…", #selector(openFolder), "o", [.command, .shift]))
+        file.addItem(withTitle: "Pin as Default Folder", action: #selector(toggleDefaultFolder), keyEquivalent: "")
         file.addItem(.separator())
         file.addItem(withTitle: "Save", action: #selector(save), keyEquivalent: "s")
         file.addItem(.separator())

@@ -4,6 +4,7 @@ struct ContentView: View {
     @EnvironmentObject var workspace: Workspace
     @EnvironmentObject var prefs: Prefs
     @State private var columns: NavigationSplitViewVisibility = UserDefaults.standard.bool(forKey: "teleprompter") ? .detailOnly : .all
+    @State private var selection: URL?
 
     var body: some View {
         NavigationSplitView(columnVisibility: $columns) {
@@ -22,18 +23,35 @@ struct ContentView: View {
     }
 
     private var sidebar: some View {
-        List(workspace.tree, children: \.children, selection: $workspace.current) { node in
-            Label(node.name, systemImage: node.isDirectory ? "folder" : "doc.text")
-                .lineLimit(1)
+        List(selection: $selection) {
+            ForEach(workspace.tree) { FileRow(node: $0, expanded: $workspace.expanded) }
         }
         .navigationTitle(workspace.root?.lastPathComponent ?? "mdmdmd")
-        .navigationSplitViewColumnWidth(min: 200, ideal: 260)
-        .onChange(of: workspace.current) { _, url in
-            if let url, !(workspace.tree.contains { $0.url == url && $0.isDirectory }) {
-                workspace.openFile(url)
-            }
+        // Double-clicking the divider snaps back to the ideal width, so the
+        // ideal tracks the widest visible row and the sidebar fits its content.
+        .navigationSplitViewColumnWidth(min: 160, ideal: fittedWidth, max: 600)
+        .onAppear { selection = workspace.current }
+        .onChange(of: workspace.current) { _, url in selection = url }
+        .onChange(of: selection) { _, url in
+            if let url, url != workspace.current { workspace.openFile(url) }
         }
         .contextMenu { Button("Reload") { workspace.reloadTree() } }
+    }
+
+    /// Width of the widest visible row: indentation, disclosure chevron, icon, label, padding.
+    private var fittedWidth: CGFloat {
+        let font = NSFont.systemFont(ofSize: NSFont.systemFontSize)
+        func widest(_ nodes: [FileNode], depth: CGFloat) -> CGFloat {
+            nodes.reduce(0) { best, node in
+                let label = (node.name as NSString).size(withAttributes: [.font: font]).width
+                var width = 56 + depth * 18 + label
+                if node.isDirectory, workspace.expanded.contains(node.url) {
+                    width = max(width, widest(node.children ?? [], depth: depth + 1))
+                }
+                return max(best, width)
+            }
+        }
+        return min(600, max(180, ceil(widest(workspace.tree, depth: 0))))
     }
 
     private var statusBar: some View {
@@ -57,5 +75,25 @@ struct ContentView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 5)
         .background(.bar)
+    }
+}
+
+private struct FileRow: View {
+    let node: FileNode
+    @Binding var expanded: Set<URL>
+
+    var body: some View {
+        if let children = node.children {
+            DisclosureGroup(isExpanded: Binding(
+                get: { expanded.contains(node.url) },
+                set: { open in if open { expanded.insert(node.url) } else { expanded.remove(node.url) } }
+            )) {
+                ForEach(children) { FileRow(node: $0, expanded: $expanded) }
+            } label: {
+                Label(node.name, systemImage: "folder").lineLimit(1)
+            }
+        } else {
+            Label(node.name, systemImage: "doc.text").lineLimit(1).tag(node.url)
+        }
     }
 }

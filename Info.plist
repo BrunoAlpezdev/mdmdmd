@@ -16,6 +16,8 @@
 	<string>APPL</string>
 	<key>CFBundleExecutable</key>
 	<string>mdmdmd</string>
+	<key>CFBundleIconFile</key>
+	<string>mdmdmd</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>14.0</string>
 	<key>NSHighResolutionCapable</key>

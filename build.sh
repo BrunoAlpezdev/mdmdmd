@@ -9,6 +9,8 @@ rm -rf "$app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 cp .build/release/mdmdmd "$app/Contents/MacOS/mdmdmd"
 cp Info.plist "$app/Contents/Info.plist"
+swift Icon/make-icon.swift .build/mdmdmd.iconset
+iconutil -c icns .build/mdmdmd.iconset -o "$app/Contents/Resources/mdmdmd.icns"
 
 identity=$(security find-identity -v -p codesigning | awk -F'"' '/Apple Development/ {print $2; exit}')
 codesign --force --sign "${identity:--}" "$app"

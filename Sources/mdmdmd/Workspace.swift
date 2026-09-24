@@ -17,6 +17,8 @@ final class Workspace: ObservableObject {
     @Published var current: URL?
     @Published private(set) var text = ""
     @Published private(set) var dirty = false
+    /// Folders open in the sidebar. Drives the tree and the fit-to-content width.
+    @Published var expanded: Set<URL> = []
 
     private var watcher: DispatchSourceFileSystemObject?
     private var autosave: Task<Void, Never>?
@@ -29,6 +31,7 @@ final class Workspace: ObservableObject {
 
     func openFolder(_ url: URL) {
         root = url
+        expanded = []
         defaults.set(url.path, forKey: "root")
         reloadTree()
     }
@@ -42,6 +45,12 @@ final class Workspace: ObservableObject {
         if root == nil || !url.path.hasPrefix(root!.path) { openFolder(url.deletingLastPathComponent()) }
         autosave?.cancel()
         current = url
+        // Reveal the file: expand every folder between the root and it.
+        var parent = url.deletingLastPathComponent()
+        while let root, parent.path.hasPrefix(root.path), parent.path != root.path {
+            expanded.insert(parent)
+            parent = parent.deletingLastPathComponent()
+        }
         defaults.set(url.path, forKey: "current")
         text = (try? String(contentsOf: url, encoding: .utf8)) ?? ""
         dirty = false

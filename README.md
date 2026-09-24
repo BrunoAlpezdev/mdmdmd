@@ -1,28 +1,62 @@
 # mdmdmd
 
-A native macOS Markdown editor in the Typora style, built for reading Loom scripts while recording.
-The window is excluded from screen capture, so it can float over the PR being recorded without showing up in the video.
+A native, open source alternative to Typora for macOS.
+One window, your Markdown rendered in place as you type, no Electron, no subscription.
 
-## Build
+It was built to read a script while recording a screen video, so it has one trick Typora does not: the window is invisible to screen capture.
+Float it over whatever you are recording and it never shows up in the video.
+
+## Install
+
+Requires macOS 14 and Xcode 26 (Swift 6.3).
 
 ```sh
-./build.sh          # swift build -c release, bundles mdmdmd.app, signs it, installs to /Applications
-swift test          # styler tests
-open -a /Applications/mdmdmd.app ~/Downloads/ENG-1234-loom-script.md
+git clone https://github.com/BrunoAlpezdev/mdmdmd
+cd mdmdmd
+./build.sh          # builds mdmdmd.app, signs it and copies it into /Applications
 ```
 
-## What it does
+`build.sh` signs with the first Apple Development certificate it finds, or ad hoc when there is none.
+Both work for a personal machine.
 
-- Live Typora-style rendering over the raw Markdown: syntax markers collapse everywhere except the paragraph under the caret.
+## Features
+
+- Typora-style live rendering over the raw Markdown.
+  Syntax markers collapse everywhere except the paragraph under the caret, so the source is always one keystroke away.
 - Sidebar with the folder tree (`.md`, `.markdown`, `.txt`), skipping `node_modules`, `.build`, `dist` and friends.
-- Autosave one second after the last edit, and reload when the file changes on disk (Claude rewrites scripts in place).
-- Status bar with spoken words and minutes at 150 wpm, counting only paragraphs (not headings, code, tables or file-name cue lines).
+  Double-click the divider to fit the sidebar to its widest visible row.
+- Autosave one second after the last edit, and reload when the file changes on disk.
+- A status bar with spoken words and the minutes they take at 150 wpm.
+  It counts paragraphs only, not headings, code, tables or lines that are just a file name in backticks.
 - Export as HTML or PDF from the rendered document.
-- Hidden from screen capture by default (`NSWindow.sharingType = .none`). View > Visible in Screen Capture turns it off.
+- Hidden from screen capture by default (`NSWindow.sharingType = .none`).
+  View > Visible in Screen Capture turns it off.
 - Teleprompter mode (⇧⌘T): floats above everything including full-screen apps, never steals focus from the app being recorded, hides the sidebar, bumps the type 40% and drops opacity to 90%.
+- Lists continue on Enter; an empty item ends the list.
 
-## Gotchas
+## Development
 
-- `NavigationSplitView` needs `NSHostingController` as the panel's content view controller. With a bare `NSHostingView` the sidebar starts collapsed.
-- To verify the capture exclusion, capture the window by id: `screencapture -l<id>` must fail with "could not create image from window".
-- swift-markdown reports columns as UTF-8 byte offsets from the line start; `LineMap` converts them to UTF-16 for `NSRange`.
+```sh
+swift build
+swift test
+swift run            # runs without the bundle; menus and window work, the Dock icon does not
+```
+
+Layout:
+
+- `Sources/mdmdmd/Styler.swift`: parses with [swift-markdown](https://github.com/swiftlang/swift-markdown) and lays attributes over the source text.
+  The same pass produces the rendered document for export by deleting the marker ranges.
+- `Sources/mdmdmd/Editor.swift`: the `NSTextView` subclass and its SwiftUI wrapper.
+- `Sources/mdmdmd/Workspace.swift`: the open folder, the file tree, autosave and the on-disk watcher.
+- `Sources/mdmdmd/main.swift`: the AppKit shell: panel, split view, menus, teleprompter and export.
+- `Icon/make-icon.swift`: draws the app icon at build time, so no binaries live in the repo.
+
+Things that bit once:
+
+- `NavigationSplitView` expands the sidebar to its maximum on a divider double-click and has no hook to change it, so the split is an `NSSplitViewController`.
+- To check that the capture exclusion holds, capture the window by id: `screencapture -l<id>` must fail with "could not create image from window".
+- swift-markdown reports columns as UTF-8 byte offsets from the start of the line; `LineMap` converts them to UTF-16 for `NSRange`.
+
+## License
+
+MIT.

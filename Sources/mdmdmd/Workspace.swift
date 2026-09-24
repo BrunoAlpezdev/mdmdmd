@@ -91,6 +91,11 @@ final class Workspace: ObservableObject {
     private func moveIntoDefaultFolder(_ url: URL, root: URL) -> URL {
         guard !url.path.hasPrefix(root.path + "/") else { return url }
         let fm = FileManager.default
+        var isDir: ObjCBool = false
+        guard fm.fileExists(atPath: root.path, isDirectory: &isDir), isDir.boolValue else {
+            defaultRoot = nil  // the pinned folder is gone; stop pinning rather than failing every open
+            return url
+        }
         var target = root.appendingPathComponent(url.lastPathComponent)
         var n = 2
         while fm.fileExists(atPath: target.path) {

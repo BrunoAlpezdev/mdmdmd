@@ -1,0 +1,11 @@
+{
+  "name": "Lexend Light",
+  "appearance": "light",
+  "background": "#FCFCFC",
+  "text": "#26292E",
+  "secondary": "#8E949E",
+  "accent": "#2E6BE6",
+  "codeBackground": "#EFF0F2",
+  "font": "Lexend",
+  "lineHeight": 1.55
+}

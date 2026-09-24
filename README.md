@@ -40,6 +40,8 @@ Both work for a personal machine.
 
 A theme is a JSON file in `~/Library/Application Support/mdmdmd/Themes/`.
 View > Theme > Open Themes Folder creates the folder with an example to copy from.
+The `Themes/` directory in this repo has two more, built around [Lexend](https://fonts.google.com/specimen/Lexend), a typeface designed for reading ease: a soft dark and a near-white light.
+Install the font, copy the files into the folder, pick Reload Themes.
 Every field is optional; whatever is missing falls back to the system look.
 
 ```json

@@ -1,0 +1,11 @@
+{
+  "name": "Lexend Dark",
+  "appearance": "dark",
+  "background": "#1B1E24",
+  "text": "#E4E6EA",
+  "secondary": "#7F8794",
+  "accent": "#82B4FF",
+  "codeBackground": "#262A32",
+  "font": "Lexend",
+  "lineHeight": 1.55
+}

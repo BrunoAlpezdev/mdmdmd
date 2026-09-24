@@ -65,16 +65,41 @@ struct DetailView: View {
     private var stats: some View {
         let words = Styler.spokenWords(workspace.text)
         let seconds = Int(Double(words) / 150 * 60)
-        return HStack(spacing: 12) {
+        return HStack(spacing: 10) {
             Text("\(words) spoken words · \(seconds / 60):\(String(format: "%02d", seconds % 60)) at 150 wpm")
-            if prefs.hiddenFromCapture {
-                Image(systemName: "eye.slash").help("Hidden from screen capture")
-            }
-            if prefs.teleprompter {
-                Image(systemName: "pin.fill").help("Teleprompter mode")
-            }
+            quickControls
         }
         .fixedSize()
+    }
+
+    /// The View menu items people reach for mid-recording, one click away.
+    private var quickControls: some View {
+        HStack(spacing: 8) {
+            Button { prefs.hiddenFromCapture.toggle() } label: {
+                Image(systemName: prefs.hiddenFromCapture ? "eye.slash" : "eye")
+            }
+            .help(prefs.hiddenFromCapture ? "Hidden from screen capture" : "Visible in screen capture")
+
+            Button { prefs.teleprompter.toggle() } label: {
+                Image(systemName: prefs.teleprompter ? "pin.fill" : "pin")
+            }
+            .help("Teleprompter mode (⇧⌘T)")
+
+            Menu {
+                Picker("Theme", selection: $prefs.themeName) {
+                    ForEach(Theme.all, id: \.name) { Text($0.name).tag($0.name) }
+                }
+                .pickerStyle(.inline)
+            } label: {
+                Image(systemName: "paintpalette")
+            }
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .help("Theme: \(prefs.themeName)")
+        }
+        .buttonStyle(.plain)
+        .menuStyle(.button)
+        .imageScale(.medium)
     }
 
     private func knob(_ icon: String, _ value: Binding<Double>, _ range: ClosedRange<Double>, _ help: String) -> some View {
